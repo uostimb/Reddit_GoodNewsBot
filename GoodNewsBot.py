@@ -14,26 +14,27 @@ client_secret=hiddensettings.client_secret
 username=hiddensettings.username
 pword=hiddensettings.pword
 
-subreddittoread='worldnews+worldnews_uk+news'
-subreddittowrite='justgoodnews'
-new_post_limit=250
+subreddit_to_read='worldnews+worldnews_uk+news'
+subreddit_to_write_good='justgoodnews'
+subreddit_to_write_bad='justbadnews'
+new_post_limit=500
 
 def main():
-    subreddit = setup_connection_reddit(subreddittoread)
+    subreddit = setup_connection_reddit(subreddit_to_read)
     getsubmissions(subreddit)
 
 
 def setup_connection_reddit(subreddit):
-    print("[bot] setting up connection with Reddit")
+    print("[bot] setting up connection to Reddit")
     reddit = praw.Reddit(user_agent=user_agent, client_id=client_id, client_secret=client_secret, username=username, password=pword)
-    subreddit = reddit.subreddit(subreddittoread)
+    subreddit = reddit.subreddit(subreddit_to_read)
     return subreddit
 
 
 def getsubmissions(subreddit_info):
     post_dict = {}
     post_dict_dirtyurl = {}
-    print("[bot] Requesting {} posts from reddit.com/r/{}/new".format(new_post_limit, subreddittoread))
+    print("[bot] Requesting {} posts from reddit.com/r/{}/new".format(new_post_limit, subreddit_to_read))
     for submission in subreddit_info.new(limit=new_post_limit):
         dirtyurl = submission.url
         newurl = clean_url(submission.url)
@@ -50,21 +51,27 @@ def getsubmissions(subreddit_info):
         post_title = post
         post_link = post_dict[post]
         post_link_dirty = post_dict_dirtyurl[post]
-        ispositive = sentiment(post_link_dirty, post_title)
-        if "pos -" in ispositive:
-            print("[bot] Pos news - {} - {} - {}".format(ispositive, post_title, post_link))
-            score = ispositive.replace("pos -", "")
-            goodnewspost(post, post_link_dirty, score)
+        posnegneutral, link_pos, title_pos, avg_pos = sentiment(post_link_dirty, post_title)
+        score = posnegneutral.replace("pos -", "").replace("neg -", "")
+        if "pos -" in posnegneutral:
+            print("[bot] POS news - {} - {} - {}".format(posnegneutral, post_title, post_link))
+            newnewspost(post, post_link_dirty, score, subreddit_to_write_good)
+        elif "neg -" in posnegneutral:
+            print("[bot] NEG news - {} - {} - {}".format(posnegneutral, post_title, post_link))
+            newnewspost(post, post_link_dirty, score, subreddit_to_write_bad)
+        elif "ERROR Checking" in posnegneutral:
+            print("[bot] ERROR - {}".format(posnegneutral))
         else:
-            print("[bot] NOT Pos news - {} - {} - {}".format(ispositive, post_title, post_link))
+            print("[bot] NEUTRAL news - {} - {} - {}".format(posnegneutral, post_title, post_link))
 
 
-def goodnewspost(post_title, post_url, score):
+def newnewspost(post_title, post_url, score, subreddit):
     reddit = praw.Reddit(user_agent=user_agent, client_id=client_id, client_secret=client_secret, username=username, password=pword)
-    print("[bot] Posting {} - {} - to /r/{} (positivity = {})".format(post_title, post_url, subreddittowrite, score))
-    post = reddit.subreddit(subreddittowrite).submit(title=post_title, url=post_url)
+    print("[bot] Posting {} - {} - to /r/{} (positivity = {})".format(post_title, post_url, subreddit, score))
+    post = reddit.subreddit(subreddit).submit(title=post_title, url=post_url)
     post.mod.flair(text="Positivity={}".format(score))
-    # time.sleep(10)
+    log("[bot] Posting {} - {} - to /r/{} (positivity = {})".format(post_title, post_url, subreddit, score))
+    time.sleep(1) # Reddit API limited to 60 requests per minute
 
 
 def sentiment(link, title):
@@ -73,9 +80,9 @@ def sentiment(link, title):
     
     try:
         link_pos = indicoio.sentiment_hq(link)
-        if link_pos > 0.9:
+        if link_pos > 0.9 or link_pos < 0.2:
             # save an API call 
-            # - don't need to waste one if page contents already > 0.9 (pos)
+            # - don't need to waste one if page contents already > 0.9 or < 0.2 (pos)
             title_pos = link_pos
         else:
             title_pos = indicoio.sentiment_hq(title)
@@ -85,8 +92,10 @@ def sentiment(link, title):
         if avg_pos > 0.8:
             posnegneutral = "pos - {} (avg)".format(avg_pos)
         elif link_pos > 0.9 or title_pos > 0.9:
-            posnegneutral = "pos - {} (max)".format(max(avg_pos))
-        elif link_pos < 0.5 or title_pos < 0.5:
+            posnegneutral = "pos - {} (max)".format(max(link_pos, title_pos))
+        elif link_pos < 0.2 or title_pos < 0.2:
+            posnegneutral = "neg - {} (min)".format(min(link_pos, title_pos))
+        elif avg_pos < 0.3:
             posnegneutral = "neg - {} (avg)".format(avg_pos)
         else:
             posnegneutral = "neutral (link_pos={} title_pos={} avg={})".format(link_pos, title_pos, avg_pos)
@@ -94,8 +103,11 @@ def sentiment(link, title):
     except:
         e = sys.exc_info()
         posnegneutral = "ERROR Checking Sentiment: {}".format(e)
+        link_pos = 0
+        title_pos = 0
+        avg_pos = 0
     
-    return posnegneutral
+    return posnegneutral, link_pos, title_pos, avg_pos
 
 
 def duplicate_check_url(url):
@@ -107,6 +119,10 @@ def duplicate_check_url(url):
     return found
 
 
+def log(event):
+    with open('log.txt', 'a') as file:
+        file.write(str(event) + "\n")
+    
 def add_url_to_file(url):
     with open('posted_posts_urls.txt', 'a') as file:
         file.write(str(url) + "\n")
