@@ -51,7 +51,7 @@ def getsubmissions(subreddit_info):
     print("[bot] Analysising sentiment for {} new posts".format(len(post_dict)))
     
     for post in post_dict:
-        post_title = str(post).encode("ascii", "replace")
+        post_title = str(post.decode("ascii", "replace"))
         post_link = post_dict[post].encode("utf-8")
         post_link_dirty = post_dict_dirtyurl[post]
         posnegneutral, link_pos, title_pos, avg_pos = sentiment(post_link_dirty, post_title)
@@ -70,7 +70,7 @@ def getsubmissions(subreddit_info):
 
 def newnewspost(post_title, post_url, score, subreddit):
     reddit = praw.Reddit(user_agent=user_agent, client_id=client_id, client_secret=client_secret, username=username, password=pword)
-    print("[bot] Posting {} - {} - to /r/{} (positivity = {})".format(str(post_title).encode("utf-8"), str(post_url).encode("utf-8"), subreddit, score))
+    print("[bot] Posting {} - {} - to /r/{} (positivity = {})".format(str(post_title), str(post_url).encode("utf-8"), subreddit, score))
     post = reddit.subreddit(subreddit).submit(title=post_title, url=post_url)
     post.mod.flair(text="Positivity={}".format(score))
     log("[bot] Posting {} - {} - to /r/{} (positivity = {})".format(str(post_title).encode("ascii", "replace"), str(post_url), subreddit, score))
