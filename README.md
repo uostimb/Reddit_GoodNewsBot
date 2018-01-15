@@ -8,4 +8,4 @@ Each time the bots runs it retrieves 1000 news posts from the subreddits "worldn
 
 To my eternal surprise and mild annoyance the /r/JustBadNews subreddit remains far more popular than /r/JustGoodNews.
 
-* although Indicogo.IO's Machine Learning "High Quality Sentiment Analysis" accuracy is improving over time, at the time of writing it currently only classifies ~80% of news posts correctly.  
+*although Indicogo.IO's Machine Learning "High Quality Sentiment Analysis" accuracy is improving over time, at the time of writing it currently only classifies ~80% of news posts correctly.  
